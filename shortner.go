@@ -2,7 +2,6 @@ package main
 
 import (
 	"encoding/json"
-	"io/ioutil"
 	"log"
 	"net/http"
 	"os"
@@ -82,13 +81,34 @@ func saveToDisk() {
 		log.Fatalf("Failed to marshal store.urls: %v", err)
 	}
 
-	if err := ioutil.WriteFile("store.json", jsonData, 0644); err != nil {
+	if err := os.WriteFile("store.json", jsonData, 0644); err != nil {
 		log.Fatalf("Failed to write to file: %v", err)
 	}
 }
 
 func loadFromDisk() {
-	jsonData, err := os.ReadFile("store.json")
+	filename := "store.json"
+	// Check if the file exists
+	if _, err := os.Stat(filename); os.IsNotExist(err) {
+		// Create the file if it doesn't exist
+		file, err := os.Create(filename)
+		if err != nil {
+			log.Fatalf("Failed to create file: %v", err)
+		}
+		defer func(file *os.File) {
+			err := file.Close()
+			if err != nil {
+				println("Unable to close file")
+				return
+			}
+		}(file)
+
+		emptyJSON := []byte("{}")
+		if err := os.WriteFile(filename, emptyJSON, 0644); err != nil {
+			log.Fatalf("Failed to write empty JSON to file: %v", err)
+		}
+	}
+	jsonData, err := os.ReadFile(filename)
 	if err != nil {
 		log.Fatalf("Failed to read file: %v", err)
 	}
@@ -122,7 +142,11 @@ func main() {
 	r.GET("/", func(c *gin.Context) {
 		index := "<html><body>Nothing to see here!</body></html>"
 		c.Writer.WriteHeader(http.StatusOK)
-		c.Writer.Write([]byte(index))
+		_, err := c.Writer.Write([]byte(index))
+		if err != nil {
+			println("Unable to write response")
+			return
+		}
 	})
 
 	ticker := time.NewTicker(10 * time.Second)
